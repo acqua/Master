@@ -1,0 +1,220 @@
+\documentclass[a4paper,10pt]{scrartcl}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{bm}
+\usepackage{amsfonts}
+\usepackage{array} % 
+\usepackage{multicol} % columns
+\usepackage{float} % Positionierung der Grafiken
+\usepackage{graphicx} % jpg, png, pdf
+\usepackage[T1]{fontenc}
+\usepackage[pdftex]{color} %F"ur Farben
+\usepackage{ctable} % toprule
+\definecolor{grau}{gray}{0.85}
+
+\setlength{\textwidth}{16cm}
+\setlength{\oddsidemargin}{0cm}
+\setlength{\textheight}{23cm}
+\setlength{\topmargin}{-1cm}
+\setlength{\parindent}{0pt}
+\newcommand{\dd}[2]{\frac{\text{d}#1}{\text{d}#2}}
+\newcommand{\ddd}[2]{\frac{\text{d}^{2}#1}{\text{d}#2^{2}}}
+%opening
+\title{ACQua - Documentation}
+\author{Max Marcus}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+The Documentation shall contain all informations regarding the program ACQua. Full discriptions of routines, modules and functions as well as
+the theoretical background.\\
+The subroutines shall be described in the section of the module they belong to and be in alphabetical order therein. Variables shall be described
+and it shall be stated at which point they are used again.\\
+A list of user keywords shall also be herein.\\
+Each subroutine documentation shall start with a box containing informations about: variables, subroutines calling and called subroutines. The variables
+shall be stated with name, followed by a two or three digit code in brackets specifying the variable type (Integer I, Real*8 R8, Character(LEN=20) C20, etc.)
+and the source and fate of it (i: inherited, g: generated, n: never to be used againm, a: altered).
+\end{abstract}
+
+\tableofcontents
+
+\section{Modules and Subroutines}
+
+\subsection{pointgroups.f90}
+\paragraph{Objective}
+If a molecule is calculated, the module \emph{pointgroups.f90} contains all necessary subroutines to generate equivalent atoms from the atoms given in
+the input. It takes the position matrix (POSMAT) and appends equivalent atoms to give the full set of atoms generating the molecule specified in the input.\\
+
+\paragraph{Theory}
+Let $\left\{\bm{G}_{i}\right\}_{i=1}^{g}$ be a full representation of the pointgroup $G$ and $g$ be its order (i.e. the number of different $\bm{G}$ in $\left\{\bm{G}\right\}$).\\
+The symmetry operation $\emph{G}_{i}$ can be represented by a $3\times3$ matrix $\bm{G}_{i}$ in Cartesian coordinates.\\
+If $\bm{R}^{(0)}$ is the matrix containing the position vectors (here: positions of inequivalent atoms specified in the input), the image of $\bm{R}^{(0)}$ under
+$\bm{G}_{i}$ can be obtained by
+\begin{equation}
+ \bm{R}^{(i)} = \bm{G}_{i}\bm{R}^{(0)}
+\end{equation}
+(in this notation the position vectors are aligned in columns rather than in rows in $\bm{R}$. Hence the transformation vectrs in $\bm{G}_{i}$ must be aligned in rows.
+The purpose will become clear later).\\
+If this is done for all $\bm{G}_{i}$ in $\left\{\bm{G}_{i}\right\}_{i=1}^{g}$ a set of $g$ position matrices is obtained $\left\{\bm{R}^{(i)}\right\}_{i=1}^{g}$
+(note: $\bm{R}^{(0)}$ is equal to the matrix obtained for the identity transformation being the trivial symmetry operation).\\
+The obtained position vectors $\left\{\bm{r}_{k}\right\}_{k=1}^{n\times g}$ ($n$ being the number of inequivalent atoms) do not need to be all unique.
+The so called \emph{unique set} of the position vectors in then $\left\{\bm{r}_{k}^{\text{uni.}}\right\}_{k=1}^{m}$.\\
+The matrices representing the symmetry operations can be obtained from the point group tables. The entry in the matrix is equivalent to the
+character of the functions $x,y,z$ under the according symmetry operation.
+
+\paragraph{Implementation}
+Each point group is assigned a number according to the International tables of Crystallography (ITA). This number is given in the input and the corresponding subroutine
+is called. The position matrix (POSMAT), red from the input, is given as input. This matrix has the form
+\begin{equation}
+ \bm{R}^{(0)} = \begin{pmatrix} 1 & 2 & \cdots & n \\ 
+                                E_{1} & E_{2} & \cdots & E_{n} \\ 
+                                x_{1} & x_{2} & \cdots & x_{n} \\ 
+                                y_{1} & y_{2} & \cdots & y_{n} \\
+                                z_{1} & z_{2} & \cdots & z_{n} \\\end{pmatrix},
+\end{equation}
+where the first row is an index from $1$ to $n$, the second row is the corresponding element number and the third to fifth row is the position vector. $n$
+is stored as NUMINAT in the code. POSMAT thus has the dimensions 5$\times$NUMINAT.\\
+This matrix is handed over to the subroutines containing the symmetry operation matrices $\left\{\bm{G}_{i}\right\}_{i=1}^{g}$ of $G$.\\
+The matrices are multiplied using \emph{matmult/matmath.f90} and each $\bm{R}^{(i)}$ is stored in different arrays. They are compared in \emph{matcomp/matmath.f90}
+in paires resulting ultimatively in the POSMAT of dimensions 5$\times$NUMAT (NUMAT being $m$ above).\\
+The transormation matrices are constructed in the subroutines themselves. The actual transformation matrix is given in the block 3-5$\times$3-5 in the 
+matrix, whereas 11 and 22 are elements of value 1 while all others are 0. The block 1-2$\times$1-2 defines a metric to conserve element and generating atom information
+to be used in the SCF.
+
+\subsubsection{c2vz}
+\fcolorbox{black}{grau}{\vbox{
+NUMINAT (Ii): number of inequivalent atoms, specified in input, inherited from \emph{pointgroup/symmetry.f90}\\
+NUMAT (Ig): total number of atoms, obtained after comparing of $\bf{R}^{(i)}$\\
+SMAT1-3 (In): number of columns in MAT1-3\\
+C2Z(5,5) (R8n): matrix of $\bm{C_{2}^{(z)}}$\\
+SXZ(5,5) (R8n): matrix of $\sigma^{(xz)}$\\
+SYZ(5,5) (R8n): matrix of $\sigma^{(yz)}$\\
+C2ZPOS(:,:) (R8n): matrix containig created atoms by C2Z\\
+SXZPOS(:,:) (R8n): matrix containig created atoms by SXZ\\
+SYZPOS(:,:) (R8n): matrix containig created atoms by SYZ\\
+MAT1(:,:) (R8n): matrix containing inequivalent atoms from POSMAT and C2ZPOS\\
+MAT2(:,:) (R8n): matrix containing inequivalent atoms from POSMAT and SXZPOS\\
+MAT3(:,:) (R8n): matrix containing inequivalent atoms from POSMAT and SYZPOS\\
+POSMAT(:,:) (Ia): matrix containing position vectors of nuclei.\\
+\ \\
+Called by: \emph{pointgroup/symmetry.f90}\\
+\ \\
+Calls: \emph{matmult/matmath.f90}, \emph{matcomp/matmath.f90}
+}}\\
+\emph{c2vz} contains the information for the point group $C_{2v}^{(z)}$ with the rotation axis being aligned to the $z$-axis. It's ITA number is 15.
+\begin{table}[H]
+\centering
+\caption{Point group table for $C_{2}(x)$.}
+\begin{tabular}{c|cccc|c}
+ & $\bm{E}$ & $\bm{C_{2}^{(z)}}$ & $\boldsymbol\sigma \bm{_{v}^{(xz)}}$ & $\boldsymbol\sigma\bm{_{v}^{(yz)}}$ &  $g=2$ \\\hline
+ $\bf{A_{1}}$ & 1 & 1  &  1 &  1 & $z, x^{2}, y^{2}, z^{2}$ \\
+ $\bf{A_{2}}$ & 1 & 1  & -1 & -1 & $R_{z},xy$\\
+ $\bf{B_{1}}$ & 1 & -1 &  1 & -1 & $x,R_{y}, xz$ \\
+ $\bf{B_{2}}$ & 1 & -1 & -1 &  1 & $y,R_{x},yz$\\\hline
+\end{tabular}
+\end{table}
+The transformation matrices C2Z(5,5), SXZ(5,5) and SYZ(5,5) are then given by
+\[ \bf{C2Z} = \begin{pmatrix} 1 & 0 & 0 & 0 & 0 \\
+                                  0 & 1 & 0 & 0 & 0 \\
+                                  0 & 0 & -1 & 0 & 0 \\
+                                  0 & 0 & 0 & -1 & 0 \\
+                                  0 & 0 & 0 & 0 & 1
+                  \end{pmatrix}\qquad
+   \bf{SXZ} = \begin{pmatrix}     1 & 0 & 0 & 0 & 0 \\
+                                  0 & 1 & 0 & 0 & 0 \\
+                                  0 & 0 & 1 & 0 & 0 \\
+                                  0 & 0 & 0 & -1 & 0 \\
+                                  0 & 0 & 0 & 0 & -1
+                  \end{pmatrix}\qquad   
+    \bf{SYZ} = \begin{pmatrix}    1 & 0 & 0 & 0 & 0 \\
+                                  0 & 1 & 0 & 0 & 0 \\
+                                  0 & 0 & -1 & 0 & 0 \\
+                                  0 & 0 & 0 & 1 & 0 \\
+                                  0 & 0 & 0 & 0 & -1
+                  \end{pmatrix}              \]
+The resulting $\bf{R}^{(1)}$, $\bf{R}^{(2)}$, $\bf{R}^{(3)}$ (obtained via \emph{matmult/matmath.f90} of POSMAT and C2Z, POSMAT and SXZ, POSMAT SYZ) are
+stored in C2ZPOS(5,NUMINAT), SXZPOS(5,NUMINAT) and SYZPOS(5,NUMINAT). C2ZPOS is then compared to POSMAT
+(via \emph{matcomp/matmath.f90}) and the resulting matrix is stored in MAT1(5,SMAT1), which is compared zu SXZPOS
+ and the resulting matrix (MAT2(5,SMAT2)) is compared to SYZPOS. The generated matrix MAT3(5,SMAT3)
+is the matrix containing all atoms building up the molecule and so it is renamed as POSMAT(5,NUMAT) and NUMAT = SMAT3.\\
+POSMAT is then printed and MAT1, MAT2 and MAT3 as well as C2XPOS, SXZPOS, SYZPOS and C2Z, SXZ, SYZ are deallocated.                  
+                  
+\subsubsection{c2x}
+\fcolorbox{black}{grau}{\vbox{
+NUMINAT (Ii): number of inequivalent atoms, specified in input, inherited from \emph{pointgroup/symmetry.f90}\\
+NUMAT (Ig): total number of atoms, obtained after comparing of $\bf{R}^{(i)}$\\
+SMAT1 (In): number of columns in MAT1\\
+C2(5,5) (R8n): matrix of $\bm{C_{2}^{(x)}}$\\
+C2XPOS(:,:) (R8n): matrix containig created atoms by C2\\
+MAT1(:,:) (R8n): matrix containing inequivalent atoms from POSMAT and C2XPOS\\
+POSMAT(:,:) (Ia): matrix containing position vectors of nuclei.\\
+\ \\
+Called by: \emph{pointgroup/symmetry.f90}\\
+\ \\
+Calls: \emph{matmult/matmath.f90}, \emph{matcomp/matmath.f90}
+}}\\
+
+\emph{c2x} contains the information for the point group $C_{2}$ with the rotation axis being aligned to the $x$-axis. It's ITA number is 3.
+\begin{table}[H]
+\centering
+\caption{Point group table for $C_{2}(x)$.}
+\begin{tabular}{c|cc|c}
+ & $\bm{E}$ & $\bm{C_{2}^{(x)}}$ & $g=2$ \\\hline
+ \bf{A} & 1 & 1 & $x,R_{x}, x^{2}, y^{2}, z^{2}, yz$ \\
+ \bf{B} & 1 & -1& $y,z,R_{y,z},xy,xz$\\\hline
+\end{tabular}
+\end{table}
+The transformation matrix C2(5,5) is then given by
+\[ \bf{C2} = \begin{pmatrix} 1 & 0 & 0 & 0 & 0 \\
+                                  0 & 1 & 0 & 0 & 0 \\
+                                  0 & 0 & 1 & 0 & 0 \\
+                                  0 & 0 & 0 & -1 & 0 \\
+                                  0 & 0 & 0 & 0 & -1
+                  \end{pmatrix}\]
+The resulting $\bf{R}^{(1)}$ (obtained via \emph{matmult/matmath.f90} of POSMAT and C2) is stored in C2XPOS(5,NUMINAT) and then compared to POSMAT
+(via \emph{matcomp/matmath.f90}). The resulting matrix is stored in MAT1(5,SMAT1). Since there is only one non-trivial symmetry operation, MAT1
+is the matrix containing all atoms building up the molecule and so it is renamed as POSMAT(5,NUMAT) and NUMAT = SMAT1.\\
+POSMAT is then printed and MAT1 as well as C2XPOS and C2 are deallocated.
+
+
+\subsubsection{ci}
+\fcolorbox{black}{grau}{\vbox{
+NUMINAT (Ii): number of inequivalent atoms, specified in input, inherited from \emph{pointgroup/symmetry.f90}\\
+NUMAT (Ig): total number of atoms, obtained after comparing of $\bf{R}^{(i)}$\\
+SMAT1 (In): number of columns in MAT1\\
+CIM(5,5) (R8n): matrix of $\bm{i}$\\
+CIPOS(:,:) (R8n): matrix containig created atoms by CIM\\
+MAT1(:,:) (R8n): matrix containing inequivalent atoms from POSMAT and CIPOS\\
+POSMAT(:,:) (Ia): matrix containing position vectors of nuclei.\\
+\ \\
+Called by: \emph{pointgroup/symmetry.f90}\\
+\ \\
+Calls: \emph{matmult/matmath.f90}, \emph{matcomp/matmath.f90}
+}}\\
+
+\emph{ci} contains the information for the point group $C_{i}$. The corresponding ITA number is 2. 
+\begin{table}[H]
+\centering
+\caption{Point group table for $C_{i}$.}
+\begin{tabular}{c|cc|c}
+ & $\bm{E}$ & $\bm{i}$ & $g=2$ \\\hline
+ \bf{A}$_{\bf{g}}$ & 1 & 1 & $R_{x-z}, x^{2}, y^{2}, z^{2}, xy, xz, yz$ \\
+ \bf{A}$_{\bf{u}}$ & 1 & -1& $x,y,z$\\\hline
+\end{tabular}
+\end{table}
+The symmetry operation matrix constructed is CIM(5,5) and has the form
+\[ \bf{CIM} = \begin{pmatrix} 1 & 0 & 0 & 0 & 0 \\
+                                  0 & 1 & 0 & 0 & 0 \\
+                                  0 & 0 & -1 & 0 & 0 \\
+                                  0 & 0 & 0 & -1 & 0 \\
+                                  0 & 0 & 0 & 0 & -1
+                  \end{pmatrix}\]
+The resulting $\bf{R}^{(1)}$ (obtained via \emph{matmult/matmath.f90} of POSMAT and CIM) is stored in CIPOS(5,NUMINAT) and then compared to POSMAT
+(via \emph{matcomp/matmath.f90}). The resulting matrix is stored in MAT1(5,SMAT1). Since there is only one non-trivial symmetry operation, MAT1
+is the matrix containing all atoms building up the molecule and so it is renamed as POSMAT(5,NUMAT) and NUMAT = SMAT1.\\
+POSMAT is then printed and MAT1 as well as CIPOS and CIM are deallocated.
+
+\end{document}
